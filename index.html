@@ -1,0 +1,94 @@
+
+<!doctype html>
+<html lang="et">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Minu kaamera</title>
+</head>
+
+<body onload="start()">
+
+    <video id="v1"
+           autoplay
+           muted
+           playsinline
+           style="width: 45%;">
+    </video>
+
+    <canvas id="c1"
+            width="320"
+            height="240"
+            style="width: 45%;">
+    </canvas>
+
+    <br>
+
+    <canvas id="c2"
+            width="40"
+            height="40">
+    </canvas>
+
+    <span id="s1"></span>
+
+    <script>
+        let player = null;
+        let c = null;
+        let g = null;
+        let g2 = null;
+        let span1 = null;
+
+        function start() {
+
+            player = document.getElementById("v1");
+
+            c = document.getElementById("c1");
+
+            g = c.getContext("2d");
+
+            g2 = document.getElementById("c2").getContext("2d");
+
+            span1 = document.getElementById("s1");
+
+            navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: "environment"
+                }
+            })
+            .then((stream) => {
+                player.srcObject = stream;
+            })
+            .catch((error) => {
+                alert("Kaamera avamine ebaõnnestus: " + error);
+            });
+
+            setInterval(capture, 1000);
+        }
+
+        function capture() {
+
+            g.drawImage(
+                player,
+                0,
+                0,
+                c.width,
+                c.height
+            );
+
+            g.strokeRect(98, 98, 44, 44);
+
+            let d = g.getImageData(
+                100,
+                100,
+                40,
+                40
+            );
+
+            g2.putImageData(d, 0, 0);
+
+            span1.innerHTML = d.data.slice(0, 8);
+        }
+    </script>
+
+</body>
+</html>
