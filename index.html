@@ -1,101 +1,512 @@
+
 <!doctype html>
 <html lang="et">
-
 <head>
-    <meta charset="UTF-8">
-    <title>Minu kaamera</title>
-</head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trips-traps-trull kaameraga</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 12px;
+    }
 
+    video {
+      display: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      max-width: 600px;
+      height: auto;
+      border: 1px solid #888;
+    }
+
+    button {
+      margin: 8px 5px 8px 0;
+      padding: 10px;
+    }
+  </style>
+</head>
 <body onload="start()">
 
-    <video id="v1"
-           autoplay
-           muted
-           playsinline
-           style="width: 100%; max-width: 600px;">
-    </video>
+  <h2>Trips-traps-trull</h2>
 
-    <canvas id="c1"
-            width="320"
-            height="240"
-            style="width: 45%;">
-    </canvas>
+  <video id="v1" autoplay muted playsinline></video>
+  <canvas id="c1" width="320" height="240"></canvas>
 
-    <br>
+  <p id="s1">Kaamera käivitub...</p>
 
-    <canvas id="c2"
-            width="40"
-            height="40">
-    </canvas>
+ 
+<p id="varviStaatus" style="color: black; font-weight: normal;">
+  Näita kaamera keskele enda valitud värvikaarti.
+</p>
 
-    <span id="s1"></span>
+<button onclick="valiMinuVarv()">Kinnita minu värv</button>
 
-    <script>
-        let player = null;
-        let c = null;
-        let g = null;
-        let g2 = null;
-        let span1 = null;
+<p>Vali mängurežiim:</p>
+<button onclick="valiReziim('arvuti')">Mängi arvutiga</button>
+<button onclick="valiReziim('vastane')">Mängi teise mängijaga</button>
+<button onclick="kinnitaVastaseVarv()">Kinnita teise mängija värv</button>
+<button onclick="uusMang()">Uus mäng</button>
 
-        function start() {
 
-            player = document.getElementById("v1");
+ 
+<script>
+const malu_url =
+  "https://script.google.com/macros/s/AKfycbyhxrTxeddvLgYI3F1kMBCqLLlRRn5V_Dx-EZLubbO_bL3RwxuCpopXSyCxkPkXCYpc/exec";
 
-            c = document.getElementById("c1");
+const video = document.getElementById("v1");
+const canvas = document.getElementById("c1");
+const ctx = canvas.getContext("2d");
+const staatus = document.getElementById("s1");
 
-            g = c.getContext("2d");
 
-            g2 = document.getElementById("c2").getContext("2d");
+let mangId = Date.now();
+let kaiguNr = 0;
+let laud = ["", "", "", "", "", "", "", "", ""];
 
-            span1 = document.getElementById("s1");
+let tuvastatudRGB = null;
+let minuRGB = null;
+let vastaseRGB = null;
+let arvutiRGB = null;
 
-            navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: "environment"
-                }
-            })
-            .then((stream) => {
-                player.srcObject = stream;
-            })
-            .catch((error) => {
-                alert("Kaamera avamine ebaõnnestus: " + error);
-            });
+let mangureziim = "";
+let reziimValitud = false;
+let mangLabi = false;
+let kord = "";
 
-            setInterval(capture, 1000);
-        }
+let eelmineKaart = "";
+let kaardiAlgusaeg = 0;
 
-        function capture() {
+const ruudud = [
+  { x: 40, y: 20, w: 80, h: 67 },
+  { x: 120, y: 20, w: 80, h: 67 },
+  { x: 200, y: 20, w: 80, h: 67 },
+  { x: 40, y: 87, w: 80, h: 67 },
+  { x: 120, y: 87, w: 80, h: 67 },
+  { x: 200, y: 87, w: 80, h: 67 },
+  { x: 40, y: 154, w: 80, h: 67 },
+  { x: 120, y: 154, w: 80, h: 67 },
+  { x: 200, y: 154, w: 80, h: 67 }
+];
 
-            g.drawImage(
-                player,
-                0,
-                0,
-                c.width,
-                c.height );
+async function start() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment" },
+      audio: false
+    });
 
-                
-                 // Trips-traps-trulli laua ala
-    g.strokeRect(40, 20, 240, 200);
+    video.srcObject = stream;
+    await video.play();
 
-    g.strokeRect(120, 20, 1, 200);
-    g.strokeRect(200, 20, 1, 200);
+    staatus.textContent = "Kaamera töötab.";
+    requestAnimationFrame(capture);
+  } catch (error) {
+    staatus.textContent = "Kaamera viga: " + error.message;
+  }
+}
 
-    g.strokeRect(40, 87, 240, 1);
-    g.strokeRect(40, 154, 240, 1);
-            g.strokeRect(98, 98, 44, 44);
+// Loeb värvi kaamera algsest pildist.
+function loeRGB(keskX, keskY, suurus) {
+  if (video.readyState < 2) return null;
 
-            let d = g.getImageData(
-                100,
-                100,
-                40,
-                40
-            );
+  const proov = document.createElement("canvas");
+  proov.width = 24;
+  proov.height = 24;
 
-            g2.putImageData(d, 0, 0);
+  const pctx = proov.getContext("2d", {
+    willReadFrequently: true
+  });
 
-            span1.innerHTML = d.data.slice(0, 8);
-        }
-    </script>
+  pctx.drawImage(
+    video,
+    keskX - suurus / 2,
+    keskY - suurus / 2,
+    suurus,
+    suurus,
+    0, 0, 24, 24
+  );
 
+  const pilt = pctx.getImageData(0, 0, 24, 24);
+  let r = 0, g = 0, b = 0, n = 0;
+
+  for (let i = 0; i < pilt.data.length; i += 4) {
+    const pr = pilt.data[i];
+    const pg = pilt.data[i + 1];
+    const pb = pilt.data[i + 2];
+
+    const max = Math.max(pr, pg, pb);
+    const min = Math.min(pr, pg, pb);
+
+    // Värvikaardiks sobivad piisavalt erksad pikslid.
+    if (max < 45 || max - min < 25) continue;
+
+    r += pr;
+    g += pg;
+    b += pb;
+    n++;
+  }
+
+  if (n < 30) return null;
+
+  return {
+    r: Math.round(r / n),
+    g: Math.round(g / n),
+    b: Math.round(b / n)
+  };
+}
+
+
+
+function rgbCss(rgb, alpha = 1) {
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+}
+
+function capture() {
+  if (video.readyState >= 2) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    tuvastatudRGB = loeRGB(
+      video.videoWidth / 2,
+      video.videoHeight / 2,
+      40
+    );
+
+    joonistaLaud();
+    kontrolliKaike();
+  }
+
+  requestAnimationFrame(capture);
+}
+
+function valiMinuVarv() {
+  if (!tuvastatudRGB) {
+    alert("Näita kaamera keskele värvilist värvikaarti.");
+    return;
+  }
+
+  minuRGB = { ...tuvastatudRGB };
+
+  varviStaatus.textContent = "Sinu värv on valitud!";
+  varviStaatus.style.fontWeight = "bold";
+}
+
+function sobibVarv(a, b) {
+  if (!a || !b) return false;
+
+  const dr = (a.r - b.r) / 255;
+  const dg = (a.g - b.g) / 255;
+  const db = (a.b - b.b) / 255;
+
+  return Math.sqrt(dr * dr + dg * dg + db * db) < 0.30;
+}
+
+
+
+function valiReziim(reziim) {
+  if (!minuRGB) {
+    alert("Vali kõigepealt oma värv.");
+    return;
+  }
+
+  mangureziim = reziim;
+
+  if (reziim === "arvuti") {
+    arvutiRGB = {
+      r: 255 - minuRGB.r,
+      g: 255 - minuRGB.g,
+      b: 255 - minuRGB.b
+    };
+
+    vastaseRGB = null;
+    alustaMang();
+    return;
+  }
+
+  vastaseRGB = null;
+  reziimValitud = false;
+
+  varviStaatus.textContent =
+    "Nüüd näitab teine mängija oma värvikaarti ja kinnitab selle.";
+  
+}
+
+function kinnitaVastaseVarv() {
+  if (mangureziim !== "vastane") {
+    alert("Vali kõigepealt „Mängi teise mängijaga”.");
+    return;
+  }
+
+  if (!minuRGB) {
+    alert("Esimene mängija peab enne oma värvi valima.");
+    return;
+  }
+
+  if (!tuvastatudRGB) {
+    alert("Näita teise mängija värvikaarti kaamera keskele.");
+    return;
+  }
+
+  if (sobibVarv(tuvastatudRGB, minuRGB)) {
+    alert("Värvid on liiga sarnased. Proovige teist värvi.");
+    return;
+  }
+
+  vastaseRGB = { ...tuvastatudRGB };
+
+  varviStaatus.textContent =
+    " Mõlema mängija värvid on valitud!";
+  
+
+  alustaMang();
+}
+
+function alustaMang() {
+  if (mangureziim === "vastane" && !vastaseRGB) {
+    alert("Teine mängija peab oma värvi kinnitama.");
+    return;
+  }
+
+  laud = ["", "", "", "", "", "", "", "", ""];
+  mangId = Date.now();
+  kaiguNr = 0;
+  mangLabi = false;
+  reziimValitud = true;
+  eelmineKaart = "";
+  kaardiAlgusaeg = 0;
+
+  if (mangureziim === "arvuti") {
+    kord = Math.random() < 0.5 ? "mina" : "arvuti";
+
+    varviStaatus.textContent =
+      kord === "mina" ? "Sinu kord!" : "Arvuti alustab.";
+
+    if (kord === "arvuti") {
+      setTimeout(arvutiKaik, 700);
+    }
+  } else {
+    kord = "mina";
+    varviStaatus.textContent = "Esimese mängija kord!";
+  }
+
+  joonistaLaud();
+}
+
+function joonistaLaud() {
+  for (let i = 0; i < 9; i++) {
+    const r = ruudud[i];
+    let rgb = null;
+
+    if (laud[i] === "mina") rgb = minuRGB;
+    if (laud[i] === "vastane") rgb = vastaseRGB;
+    if (laud[i] === "arvuti") rgb = arvutiRGB;
+
+    if (rgb) {
+      ctx.fillStyle = rgbCss(rgb, 0.65);
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+  }
+
+  ctx.strokeStyle = "white";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(40, 20, 240, 200);
+
+  ctx.beginPath();
+  ctx.moveTo(120, 20);
+  ctx.lineTo(120, 220);
+  ctx.moveTo(200, 20);
+  ctx.lineTo(200, 220);
+  ctx.moveTo(40, 87);
+  ctx.lineTo(280, 87);
+  ctx.moveTo(40, 154);
+  ctx.lineTo(280, 154);
+  ctx.stroke();
+}
+
+function kontrolliKaike() {
+  if (!reziimValitud || mangLabi) return;
+  if (kord === "arvuti") return;
+
+  const aktiivneRGB =
+    kord === "mina" ? minuRGB : vastaseRGB;
+
+  if (!aktiivneRGB) return;
+
+  let leitudRuut = -1;
+
+  for (let i = 0; i < ruudud.length; i++) {
+    if (laud[i] !== "") continue;
+
+    const r = ruudud[i];
+
+    const x = (r.x + r.w / 2) *
+      video.videoWidth / canvas.width;
+    const y = (r.y + r.h / 2) *
+      video.videoHeight / canvas.height;
+
+    const rgb = loeRGB(x, y, 30);
+
+    if (sobibVarv(rgb, aktiivneRGB)) {
+      leitudRuut = i;
+      break;
+    }
+  }
+
+  if (leitudRuut === -1) {
+    eelmineKaart = "";
+    kaardiAlgusaeg = 0;
+    return;
+  }
+
+  const tunnus = kord + ":" + leitudRuut;
+
+  if (tunnus !== eelmineKaart) {
+    eelmineKaart = tunnus;
+    kaardiAlgusaeg = Date.now();
+    return;
+  }
+
+  if (Date.now() - kaardiAlgusaeg < 1200) return;
+
+  laud[leitudRuut] = kord;
+  salvestaKaik(kord, leitudRuut + 1);
+
+  eelmineKaart = "";
+  kaardiAlgusaeg = 0;
+
+  if (kontrolliVoitu()) {
+    joonistaLaud();
+    return;
+  }
+
+  if (mangureziim === "arvuti") {
+    kord = "arvuti";
+    varviStaatus.textContent = "Arvuti käik...";
+    setTimeout(arvutiKaik, 700);
+  } else {
+    kord = kord === "mina" ? "vastane" : "mina";
+    varviStaatus.textContent =
+      kord === "mina" ? "Esimese mängija kord!" : "Teise mängija kord!";
+  }
+
+  joonistaLaud();
+}
+
+function kontrolliVoitu() {
+  const read = [
+    [0,1,2], [3,4,5], [6,7,8],
+    [0,3,6], [1,4,7], [2,5,8],
+    [0,4,8], [2,4,6]
+  ];
+
+  for (const r of read) {
+    if (
+      laud[r[0]] !== "" &&
+      laud[r[0]] === laud[r[1]] &&
+      laud[r[1]] === laud[r[2]]
+    ) {
+      mangLabi = true;
+
+      const voitja = laud[r[0]];
+
+      varviStaatus.textContent =
+        voitja === "mina" ? "Esimene mängija võitis!" :
+        voitja === "arvuti" ? "Arvuti võitis!" :
+        "Teine mängija võitis!";
+
+      return true;
+    }
+  }
+
+  if (laud.every(v => v !== "")) {
+    mangLabi = true;
+    varviStaatus.textContent = "Viik!";
+    return true;
+  }
+
+  return false;
+}
+
+function arvutiKaik() {
+  if (mangLabi || !reziimValitud || kord !== "arvuti") return;
+
+  const vabad = laud
+    .map((v, i) => v === "" ? i : -1)
+    .filter(i => i !== -1);
+
+  if (!vabad.length) {
+    kontrolliVoitu();
+    return;
+  }
+
+  const i = vabad[Math.floor(Math.random() * vabad.length)];
+  laud[i] = "arvuti";
+
+  salvestaKaik("arvuti", i + 1);
+
+  if (kontrolliVoitu()) {
+    joonistaLaud();
+    return;
+  }
+
+  kord = "mina";
+  varviStaatus.textContent = "Sinu kord!";
+  joonistaLaud();
+}
+
+
+function saadaSheetsi(andmed) {
+  fetch(malu_url, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify(andmed)
+  }).catch(error => console.error("Google Sheetsi viga:", error));
+}
+
+function salvestaKaik(mangija, ruut) {
+  kaiguNr++;
+
+  const seis = laud.map(v => {
+    if (v === "mina" || v === "arvuti") return "X";
+    if (v === "vastane") return "O";
+    return ".";
+  }).join("");
+
+  saadaSheetsi({
+    tegevus: "salvesta",
+    mang_id: mangId,
+    kaigu_nr: kaiguNr,
+    mangija: mangija,
+    ruut: ruut,
+    laua_seis: seis
+  });
+}
+
+function uusMang() {
+ saadaSheetsi({ tegevus: "uus_mang" });
+
+  laud = ["", "", "", "", "", "", "", "", ""];
+  mangId = Date.now();
+  kaiguNr = 0;
+  mangLabi = false;
+  reziimValitud = false;
+  kord = "";
+  eelmineKaart = "";
+  kaardiAlgusaeg = 0;
+
+  varviStaatus.textContent =
+    "Laud on tühi. Vali mängurežiim.";
+
+  joonistaLaud();
+}
+
+
+</script>
 </body>
 </html>
